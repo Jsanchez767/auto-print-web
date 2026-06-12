@@ -3,76 +3,113 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Auto-Print Web</title>
+  <meta name="theme-color" content="#000000" />
+  <title>Auto-Print</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="logo">🖨️</span>
-      <div>
-        <h1>Auto-Print Web</h1>
-        <p class="sub">Prints on <strong id="hostName">the printer computer</strong> from anywhere</p>
+  <header class="nav">
+    <div class="nav-inner">
+      <div class="brand">
+        <svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2M6 14h12v7H6z"
+            stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Auto-Print</span>
       </div>
-    </div>
-    <div class="conn">
-      <span id="dot" class="dot off"></span>
-      <span id="connText">checking…</span>
+      <div class="status" id="status">
+        <span id="dot" class="dot"></span>
+        <span id="connText">checking…</span>
+      </div>
     </div>
   </header>
 
-  <main class="layout">
-    <section class="card sender">
-      <h2>New print job</h2>
+  <main class="wrap">
+    <div class="hero">
+      <h1>Print from anywhere</h1>
+      <p>Send a job to <span id="hostName">the printer computer</span> and it prints automatically.</p>
+    </div>
 
-      <label class="field">
-        <span>Access key</span>
-        <input id="key" type="password" placeholder="Required to print" autocomplete="off" />
-      </label>
+    <div class="grid">
+      <!-- Compose -->
+      <section class="card">
+        <div class="card-head">
+          <h2>New job</h2>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label for="key">Access key</label>
+            <input id="key" type="password" placeholder="••••••••" autocomplete="off" />
+          </div>
 
-      <label class="field">
-        <span>Your name / device</span>
-        <input id="device" type="text" placeholder="e.g. Jesus' Laptop" />
-      </label>
+          <div class="field">
+            <label for="device">Your device</label>
+            <input id="device" type="text" placeholder="e.g. Jesus' Laptop" />
+          </div>
 
-      <label class="field">
-        <span>Printer</span>
-        <select id="printer"></select>
-      </label>
+          <div class="field">
+            <label for="printer">Printer</label>
+            <div class="select-wrap">
+              <select id="printer"></select>
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
 
-      <div class="tabs">
-        <button class="tab active" data-tab="text">Text</button>
-        <button class="tab" data-tab="file">File</button>
-      </div>
+          <div class="seg" role="tablist">
+            <button class="seg-btn active" data-tab="text" role="tab">Text</button>
+            <button class="seg-btn" data-tab="file" role="tab">File</button>
+          </div>
 
-      <div id="tab-text" class="tabpane active">
-        <textarea id="text" rows="8" placeholder="Type anything to print…"></textarea>
-      </div>
+          <div id="tab-text" class="tabpane active">
+            <div class="field">
+              <textarea id="text" rows="6" placeholder="Type anything to print…"></textarea>
+            </div>
+          </div>
 
-      <div id="tab-file" class="tabpane">
-        <label id="drop" class="drop">
-          <input id="file" type="file"
-            accept=".pdf,.txt,.png,.jpg,.jpeg,.gif,.bmp,.doc,.docx,.rtf,.odt,.ps" />
-          <span id="dropText">Click to choose a file or drop it here (max 3 MB)</span>
-        </label>
-      </div>
+          <div id="tab-file" class="tabpane">
+            <label id="drop" class="drop">
+              <input id="file" type="file"
+                accept=".pdf,.txt,.png,.jpg,.jpeg,.gif,.bmp,.doc,.docx,.rtf,.odt,.ps" />
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 16V4m0 0L8 8m4-4l4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+                  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <span id="dropText">Choose a file or drop it here</span>
+              <small>Max 3 MB · PDF, images, docs</small>
+            </label>
+          </div>
 
-      <div class="row">
-        <label class="field small">
-          <span>Copies</span>
-          <input id="copies" type="number" min="1" max="50" value="1" />
-        </label>
-        <button id="send" class="primary">Print now</button>
-      </div>
+          <div class="actions">
+            <div class="field copies">
+              <label for="copies">Copies</label>
+              <input id="copies" type="number" min="1" max="50" value="1" />
+            </div>
+            <button id="send" class="btn-primary">Print now</button>
+          </div>
 
-      <p id="msg" class="msg"></p>
-    </section>
+          <p id="msg" class="msg"></p>
+        </div>
+      </section>
 
-    <section class="card feed">
-      <h2>Live activity</h2>
-      <p class="hint">Jobs from every connected computer appear here, updating as they print.</p>
-      <ul id="jobs" class="jobs"></ul>
-    </section>
+      <!-- Activity -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Activity</h2>
+          <span class="muted-sm">live</span>
+        </div>
+        <div class="card-body no-pad">
+          <ul id="jobs" class="jobs">
+            <li class="empty">No jobs yet.</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+
+    <footer class="foot">
+      Self-hosted · jobs route to the computer that owns the printer.
+    </footer>
   </main>
 
   <script src="/app.js"></script>

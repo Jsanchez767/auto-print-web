@@ -57,8 +57,8 @@ document.querySelectorAll(".tab").forEach((btn) => {
 function updateDropLabel() {
   const f = els.file.files[0];
   els.dropText.textContent = f
-    ? `📄 ${f.name} (${formatSize(f.size)})`
-    : "Click to choose a file or drop it here (max 3 MB)";
+    ? `${f.name} (${formatSize(f.size)})`
+    : "Choose a file or drop it here";
 }
 els.file.addEventListener("change", updateDropLabel);
 ["dragenter", "dragover"].forEach((e) =>
@@ -137,7 +137,7 @@ function hostSummary(onlineAgents) {
 function renderJobs(jobs) {
   els.jobs.innerHTML = "";
   if (!jobs.length) {
-    els.jobs.innerHTML = '<li class="empty">No jobs yet. Send your first print!</li>';
+    els.jobs.innerHTML = '<li class="empty">No jobs yet.</li>';
     return;
   }
   jobs.forEach((job) => {
@@ -151,7 +151,7 @@ function renderJobs(jobs) {
     li.innerHTML = `
       <div class="line1">
         <span class="name"></span>
-        <span class="status">${job.status}</span>
+        <span class="badge">${job.status}</span>
       </div>
       <div class="line2"></div>`;
     li.querySelector(".name").textContent = `${job.name || "(untitled)"} — ${job.device}`;
