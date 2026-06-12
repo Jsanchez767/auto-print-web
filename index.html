@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auto-Print Web</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🖨️</span>
+      <div>
+        <h1>Auto-Print Web</h1>
+        <p class="sub">Prints on <strong id="hostName">the printer computer</strong> from anywhere</p>
+      </div>
+    </div>
+    <div class="conn">
+      <span id="dot" class="dot off"></span>
+      <span id="connText">checking…</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="card sender">
+      <h2>New print job</h2>
+
+      <label class="field">
+        <span>Access key</span>
+        <input id="key" type="password" placeholder="Required to print" autocomplete="off" />
+      </label>
+
+      <label class="field">
+        <span>Your name / device</span>
+        <input id="device" type="text" placeholder="e.g. Jesus' Laptop" />
+      </label>
+
+      <label class="field">
+        <span>Printer</span>
+        <select id="printer"></select>
+      </label>
+
+      <div class="tabs">
+        <button class="tab active" data-tab="text">Text</button>
+        <button class="tab" data-tab="file">File</button>
+      </div>
+
+      <div id="tab-text" class="tabpane active">
+        <textarea id="text" rows="8" placeholder="Type anything to print…"></textarea>
+      </div>
+
+      <div id="tab-file" class="tabpane">
+        <label id="drop" class="drop">
+          <input id="file" type="file"
+            accept=".pdf,.txt,.png,.jpg,.jpeg,.gif,.bmp,.doc,.docx,.rtf,.odt,.ps" />
+          <span id="dropText">Click to choose a file or drop it here (max 3 MB)</span>
+        </label>
+      </div>
+
+      <div class="row">
+        <label class="field small">
+          <span>Copies</span>
+          <input id="copies" type="number" min="1" max="50" value="1" />
+        </label>
+        <button id="send" class="primary">Print now</button>
+      </div>
+
+      <p id="msg" class="msg"></p>
+    </section>
+
+    <section class="card feed">
+      <h2>Live activity</h2>
+      <p class="hint">Jobs from every connected computer appear here, updating as they print.</p>
+      <ul id="jobs" class="jobs"></ul>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
