@@ -1,0 +1,23 @@
+# Render Blueprint for Auto-Print.
+# Create the service from this file:  Render dashboard → New → Blueprint →
+# pick this repo. Render reads this and provisions the web service.
+services:
+  - type: web
+    name: auto-print
+    runtime: python
+    plan: starter          # "starter" stays always-on ($7/mo). Use "free" to test (sleeps when idle).
+    region: oregon         # change if you prefer a closer region
+    branch: main
+    buildCommand: ""       # pure Python stdlib — nothing to build
+    startCommand: python3 cloud_server.py
+    healthCheckPath: /api/info
+    autoDeploy: true
+    envVars:
+      - key: ACCESS_KEY    # key the browser must enter; set a value in the dashboard
+        sync: false
+      - key: AGENT_TOKEN   # token the local agent must send
+        sync: false
+      - key: PUBLIC_HOST   # optional: your custom domain, e.g. print.maticsapp.com
+        sync: false
+      - key: IPP_DEFAULT   # optional: force AirPrint target as "agentid||printer"
+        sync: false

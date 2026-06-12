@@ -306,6 +306,36 @@ select option { font-weight: 400; }
 .btn-primary:active { transform: translateY(1px); }
 .btn-primary:disabled { opacity: .5; cursor: default; }
 
+.btn-secondary {
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--fg);
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s, transform .05s;
+}
+.btn-secondary:hover { background: var(--hover); }
+.btn-secondary:active { transform: translateY(1px); }
+
+.copy-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.copy-row input { flex: 1; }
+.copy-row #defaultRoute { flex: 1; }
+
+.card.span-2 { grid-column: 1 / -1; }
+@media (max-width: 760px) {
+  .card.span-2 { grid-column: auto; }
+}
+
 .msg {
   min-height: 18px;
   margin: 14px 0 0;

@@ -67,7 +67,7 @@
                   stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
               <span id="dropText">Choose files or drop them here</span>
-              <small>Up to 3 MB each · PDF, images, docs</small>
+              <small>PDF, images, docs · multiple files OK</small>
             </label>
             <ul id="fileList" class="file-list"></ul>
           </div>
@@ -94,6 +94,35 @@
           <ul id="jobs" class="jobs">
             <li class="empty">No jobs yet.</li>
           </ul>
+        </div>
+      </section>
+
+      <!-- Add to devices (AirPrint / IPP) -->
+      <section class="card span-2">
+        <div class="card-head">
+          <h2>Add to your devices</h2>
+          <span class="muted-sm">AirPrint / IPP</span>
+        </div>
+        <div class="card-body">
+          <p class="muted-sm" style="margin-top:0">
+            Add this address as a printer on a Mac, iPhone, iPad, Windows or Linux
+            device. Everything you print to it goes to the default printer below.
+          </p>
+          <div class="field">
+            <label for="ippUrl">Printer address</label>
+            <div class="copy-row">
+              <input id="ippUrl" type="text" readonly value="—" />
+              <button id="copyIpp" class="btn-secondary" type="button">Copy</button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Default printer for added devices</label>
+            <div class="copy-row">
+              <span id="defaultRoute" class="muted-sm">none set</span>
+              <button id="setDefault" class="btn-secondary" type="button">Use selected printer</button>
+            </div>
+          </div>
+          <p id="ippMsg" class="msg"></p>
         </div>
       </section>
     </div>

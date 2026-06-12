@@ -26,6 +26,76 @@ It works in two parts:
 
 ---
 
+## Two ways to host
+
+| | **Vercel** (serverless) | **Render** (always-on) — recommended |
+|---|---|---|
+| File size limit | 4.5 MB / request | none (large PDFs/photos OK) |
+| Queue backend | Upstash Redis | in-memory (no external DB) |
+| **Add as a native printer (AirPrint/IPP)** | ❌ | ✅ `cloud_server.py` |
+| Custom domain | DNS on Vercel | CNAME → Render (no nameserver move) |
+| Server file | `api/*.py` | `cloud_server.py` |
+
+Both still need **`agent.py`** running on the printer computer — the cloud can't
+physically reach a printer.
+
+---
+
+## Add it as a printer on your devices (AirPrint / IPP)
+
+With the Render server (`cloud_server.py`), the app exposes an **IPP endpoint** so
+any Mac, iPhone, iPad, Windows or Linux device can add it as a normal printer and
+use the native print dialog. Jobs go to whichever printer is set as the **default
+on the site** ("Add to your devices" card → *Use selected printer*).
+
+```
+ Any device          Render (cloud)                 Your printer computer
+ ┌───────────┐ ipps  ┌────────────────────┐  poll   ┌────────────────────┐
+ │ Print →   │ ────▶ │ /ipp/print  +  UI  │ ◀────── │ agent.py           │
+ │ Auto-Print│       │ in-memory queue    │ ──jobs▶ │  → lp → Printer     │
+ └───────────┘       └────────────────────┘ status  └────────────────────┘
+```
+
+**Add the printer:**
+- **macOS:** System Settings → Printers & Scanners → Add Printer → **IP** tab →
+  Address `print.yourdomain.com`, Protocol **Internet Printing Protocol – IPP**,
+  Queue `ipp/print`. (Use the exact `ipps://…/ipp/print` URL from the site's
+  "Add to your devices" card.)
+- **iPhone/iPad:** native AirPrint discovery works on the same network; for
+  internet use, devices print through the site or a configured IPP profile.
+- The site shows the exact address to copy.
+
+> Security note: the IPP endpoint accepts jobs and sends them to the **default
+> printer chosen on the site** — pick that default deliberately.
+
+---
+
+## Deploy to Render (recommended)
+
+1. Push this repo to GitHub (see below).
+2. Render dashboard → **New → Blueprint** → pick this repo. It reads
+   [`render.yaml`](render.yaml) and creates a `web` service running
+   `python3 cloud_server.py`.
+3. Set env vars in the dashboard:
+   - `ACCESS_KEY` — what users type in the web UI
+   - `AGENT_TOKEN` — what the local agent sends
+   - `PUBLIC_HOST` *(optional)* — your custom domain, e.g. `print.maticsapp.com`
+4. **Custom domain (no nameserver change):** Render service → Settings → Custom
+   Domains → add `print.maticsapp.com`. Render shows a CNAME target; add that as a
+   **CNAME record** in your existing Vercel DNS. Render issues TLS automatically.
+5. Run the agent on the printer computer, pointed at the Render URL:
+   ```bash
+   python3 agent.py --relay https://print.maticsapp.com --token "$AGENT_TOKEN"
+   ```
+6. Open the site, enter the access key, pick a printer, and click **Use selected
+   printer** in the "Add to your devices" card to make it the AirPrint target.
+
+> **Cold starts:** Render's free tier sleeps after ~15 min idle; the first print
+> may time out while it wakes. The **Starter** plan stays always-on.
+
+---
+
+
 ## Project layout
 
 ```
@@ -40,7 +110,10 @@ auto-print-web/
 │   ├── heartbeat.py  POST /api/heartbeat   (agent reports printers)
 │   └── status.py     POST /api/status      (agent reports job result)
 ├── agent.py                        # runs on the printer computer
+├── ipp_server.py                   # IPP/AirPrint codec + local IPP server (agent --ipp)
+├── cloud_server.py                 # always-on server for Render (UI + relay + IPP)
 ├── server.py                       # optional: local-only LAN mode (no cloud)
+├── render.yaml                     # Render blueprint
 ├── vercel.json
 └── .env.example
 ```

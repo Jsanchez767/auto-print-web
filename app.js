@@ -17,6 +17,11 @@ const els = {
   dot: $("dot"),
   connText: $("connText"),
   hostName: $("hostName"),
+  ippUrl: $("ippUrl"),
+  copyIpp: $("copyIpp"),
+  defaultRoute: $("defaultRoute"),
+  setDefault: $("setDefault"),
+  ippMsg: $("ippMsg"),
 };
 
 // Files staged for printing (DataTransfer lets us add across multiple drops).
@@ -43,7 +48,7 @@ function authHeaders(extra) {
 // --------------------------------------------------------------------- //
 // File drag & drop (multiple)
 // --------------------------------------------------------------------- //
-const MAX_BYTES = 3 * 1024 * 1024;
+const MAX_BYTES = 25 * 1024 * 1024;
 
 function syncFileInput() {
   els.file.files = staged.files;
@@ -161,9 +166,73 @@ async function loadPrinters() {
     } else if (prev) {
       els.printer.value = prev; // keep selection across refreshes
     }
+    renderDefaultRoute(data.default_route, agents);
   } catch (e) {
     setConn(false);
   }
+}
+
+function renderDefaultRoute(route, agents) {
+  if (!els.defaultRoute) return;
+  if (route && route.printer) {
+    const agent = (agents || []).find((a) => a.agent_id === route.agent_id);
+    const host = agent ? agent.host : "";
+    els.defaultRoute.textContent = host ? `${route.printer} @ ${host}` : route.printer;
+  } else {
+    els.defaultRoute.textContent = "none set";
+  }
+}
+
+async function loadIppUrl() {
+  if (!els.ippUrl) return;
+  try {
+    const res = await fetch("/api/info");
+    const data = await res.json();
+    if (data.ipp_uri) els.ippUrl.value = data.ipp_uri;
+  } catch (e) {}
+}
+
+function ippShow(text, ok) {
+  if (!els.ippMsg) return;
+  els.ippMsg.textContent = text;
+  els.ippMsg.className = "msg " + (ok ? "ok" : "err");
+}
+
+if (els.copyIpp) {
+  els.copyIpp.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(els.ippUrl.value);
+      ippShow("Copied ✓", true);
+    } catch (e) {
+      els.ippUrl.select();
+      ippShow("Press ⌘C to copy.", true);
+    }
+  });
+}
+
+if (els.setDefault) {
+  els.setDefault.addEventListener("click", async () => {
+    const selected = els.printer.value;
+    if (!selected || selected.indexOf("||") === -1) {
+      return ippShow("Pick a printer above first.", false);
+    }
+    const [agentId, printer] = selected.split("||");
+    try {
+      const res = await fetch("/api/default", {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({ agent_id: agentId, printer }),
+      });
+      if (res.ok) {
+        ippShow(`Added devices will now print to ${printer} ✓`, true);
+        loadPrinters();
+      } else {
+        ippShow("Could not set default (check access key).", false);
+      }
+    } catch (e) {
+      ippShow("Network error: " + e.message, false);
+    }
+  });
 }
 
 function hostSummary(onlineAgents) {
@@ -244,7 +313,7 @@ els.send.addEventListener("click", async () => {
   if (!files.length) return showMsg("Choose at least one file.", false);
   const tooBig = files.filter((f) => f.size > MAX_BYTES);
   if (tooBig.length) {
-    return showMsg(`Too large (3 MB max): ${tooBig.map((f) => f.name).join(", ")}`, false);
+    return showMsg(`Too large (25 MB max): ${tooBig.map((f) => f.name).join(", ")}`, false);
   }
 
   els.send.disabled = true;
@@ -284,6 +353,7 @@ els.send.addEventListener("click", async () => {
 // --------------------------------------------------------------------- //
 // Init + polling loops
 // --------------------------------------------------------------------- //
+loadIppUrl();
 loadPrinters();
 loadJobs();
 setInterval(loadPrinters, 10000);
