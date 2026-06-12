@@ -33,12 +33,19 @@ class handler(BaseHTTPRequestHandler):
 
         device = (data.get("device") or "Unknown device").strip()[:60]
         printer = (data.get("printer") or "").strip()
+        agent_id = (data.get("agent_id") or "").strip()[:64]
         copies = max(1, min(int(data.get("copies") or 1), 50))
         kind = data.get("kind", "text")
+
+        if not agent_id:
+            send_json(self, {"error": "Choose a printer (no target computer selected)"}, 400)
+            return
 
         job = {
             "id": uuid.uuid4().hex[:8],
             "device": device,
+            "agent_id": agent_id,
+            "host": (data.get("host") or "").strip()[:80],
             "printer": printer,
             "copies": copies,
             "kind": kind,

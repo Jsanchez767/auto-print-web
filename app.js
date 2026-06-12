@@ -94,22 +94,41 @@ async function loadPrinters() {
     const res = await fetch("/api/printers", { headers: authHeaders() });
     if (res.status === 401) { setConn(false); els.connText.textContent = "enter access key"; return; }
     const data = await res.json();
-    setConn(data.online, data.host);
+    const agents = data.agents || [];
+    const onlineAgents = agents.filter((a) => a.online);
+    setConn(data.online, hostSummary(onlineAgents));
+
+    const prev = els.printer.value;
     els.printer.innerHTML = "";
-    if (!data.printers || !data.printers.length) {
-      els.printer.innerHTML = '<option value="">No printers reported yet</option>';
-      return;
-    }
-    data.printers.forEach((p) => {
-      const opt = document.createElement("option");
-      opt.value = p.name;
-      opt.textContent = `${p.name} (${p.status})`;
-      if (p.name === data.default) opt.selected = true;
-      els.printer.appendChild(opt);
+    let optionCount = 0;
+    agents.forEach((a) => {
+      if (!a.printers || !a.printers.length) return;
+      const group = document.createElement("optgroup");
+      group.label = `${a.host || "computer"}${a.online ? "" : " (offline)"}`;
+      a.printers.forEach((p) => {
+        const opt = document.createElement("option");
+        opt.value = `${a.agent_id}||${p.name}`;
+        opt.textContent = `${p.name} (${p.status})`;
+        opt.disabled = !a.online;
+        group.appendChild(opt);
+        optionCount++;
+      });
+      els.printer.appendChild(group);
     });
+    if (!optionCount) {
+      els.printer.innerHTML = '<option value="">No printers shared yet</option>';
+    } else if (prev) {
+      els.printer.value = prev; // keep selection across refreshes
+    }
   } catch (e) {
     setConn(false);
   }
+}
+
+function hostSummary(onlineAgents) {
+  if (!onlineAgents.length) return null;
+  if (onlineAgents.length === 1) return onlineAgents[0].host;
+  return `${onlineAgents.length} computers`;
 }
 
 // --------------------------------------------------------------------- //
@@ -125,9 +144,10 @@ function renderJobs(jobs) {
     const li = document.createElement("li");
     li.className = "job " + job.status;
     const time = new Date(job.ts * 1000).toLocaleTimeString();
+    const target = job.host ? `${job.printer || "printer"} @ ${job.host}` : (job.printer || "default printer");
     const detail = job.status === "error"
       ? job.detail
-      : `${job.printer || "default printer"} · ${job.copies} cop${job.copies > 1 ? "ies" : "y"}${job.detail ? " · " + job.detail : ""}`;
+      : `${target} · ${job.copies} cop${job.copies > 1 ? "ies" : "y"}${job.detail ? " · " + job.detail : ""}`;
     li.innerHTML = `
       <div class="line1">
         <span class="name"></span>
@@ -168,9 +188,17 @@ function showMsg(text, ok) {
 
 els.send.addEventListener("click", async () => {
   const device = els.device.value.trim() || "Unknown device";
-  const printer = els.printer.value;
+  const selected = els.printer.value;
   const copies = parseInt(els.copies.value, 10) || 1;
-  const payload = { device, printer, copies, kind: currentTab };
+
+  if (!selected || selected.indexOf("||") === -1) {
+    return showMsg("Choose a printer first.", false);
+  }
+  const [agentId, printer] = selected.split("||");
+  const hostLabel = els.printer.selectedOptions[0]
+    ? els.printer.selectedOptions[0].parentNode.label.replace(/ \(offline\)$/, "")
+    : "";
+  const payload = { device, agent_id: agentId, host: hostLabel, printer, copies, kind: currentTab };
 
   if (currentTab === "file") {
     const f = els.file.files[0];

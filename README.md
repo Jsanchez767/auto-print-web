@@ -103,6 +103,41 @@ You should see it report its printers and start polling. Leave it running.
 
 ---
 
+## Sharing printers from more than one computer
+
+Anyone can share their printers — the app supports **multiple printer-host
+computers at once**. Each person just runs their own agent:
+
+1. Copy this project (or just `agent.py`) to their macOS/Linux computer.
+2. Run it with the **same relay URL and `AGENT_TOKEN`**, and an optional
+   friendly name:
+
+   ```bash
+   python3 agent.py \
+     --relay https://your-app.vercel.app \
+     --token YOUR_AGENT_TOKEN \
+     --name "Front Desk Mac"
+   ```
+
+Each agent automatically gets a **stable, unique id** (saved to
+`~/.config/auto-print/agent_id`) and registers its own printers. In the web app,
+the printer dropdown groups printers **by computer**, e.g.:
+
+```
+▾ Jesus' MacBook
+    HP OfficeJet Pro 9010 (idle)
+    HP Color LaserJet (idle)
+▾ Front Desk Mac
+    Brother HL-L2350DW (idle)
+```
+
+Pick any printer and the job is routed to that specific computer's agent.
+Offline computers are shown greyed-out. Everyone shares one `AGENT_TOKEN`; if you
+want per-person revocation instead, that can be added later.
+
+---
+
+
 ## Use it
 
 1. Open `https://your-app.vercel.app` on any computer or phone.

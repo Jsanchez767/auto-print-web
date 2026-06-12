@@ -34,11 +34,20 @@ _REDIS_TOKEN = (
     or ""
 )
 
-FEED_KEY = "feed"        # list of job ids, newest first
-QUEUE_KEY = "queue"      # list of pending job ids for the agent (FIFO)
-PRINTERS_KEY = "printers"  # JSON: {host, printers, ts}
-JOB_TTL = 3600           # seconds a job record lives
+FEED_KEY = "feed"            # list of job ids, newest first
+AGENTS_KEY = "agents"        # set of known agent ids
+JOB_TTL = 3600               # seconds a job record lives
+AGENT_TTL = 120              # seconds an agent record lives between heartbeats
+AGENT_ONLINE_WINDOW = 90     # seconds since last heartbeat to count as online
 MAX_FEED = 100
+
+
+def _queue_key(agent_id):
+    return f"queue:{agent_id}"
+
+
+def _agent_key(agent_id):
+    return f"agent:{agent_id}"
 
 
 class StoreError(RuntimeError):
@@ -138,19 +147,22 @@ def read_json(handler):
 # --------------------------------------------------------------------------- #
 
 def enqueue_job(job):
-    """Store a full job (incl. content) and queue it for the agent + feed."""
+    """Store a full job (incl. content) and queue it for its target agent."""
     jid = job["id"]
+    agent_id = job.get("agent_id") or ""
     pipeline([
         ["SET", f"job:{jid}", json.dumps(job), "EX", str(JOB_TTL)],
-        ["RPUSH", QUEUE_KEY, jid],
+        ["RPUSH", _queue_key(agent_id), jid],
         ["LPUSH", FEED_KEY, jid],
         ["LTRIM", FEED_KEY, "0", str(MAX_FEED - 1)],
     ])
 
 
-def next_queued_job():
-    """Pop the oldest queued job id and return its full record (or None)."""
-    jid = redis("LPOP", QUEUE_KEY)
+def next_queued_job(agent_id):
+    """Pop the oldest queued job for one agent and return its record (or None)."""
+    if not agent_id:
+        return None
+    jid = redis("LPOP", _queue_key(agent_id))
     if not jid:
         return None
     raw = redis("GET", f"job:{jid}")
@@ -190,15 +202,41 @@ def feed(limit=MAX_FEED):
     return jobs
 
 
-def set_printers(host, printers):
-    payload = {"host": host, "printers": printers, "ts": time.time()}
-    redis("SET", PRINTERS_KEY, json.dumps(payload), "EX", "120")
+def set_agent(agent_id, host, printers):
+    """Register/refresh one agent's printers (called on every heartbeat)."""
+    payload = {
+        "agent_id": agent_id,
+        "host": host,
+        "printers": printers,
+        "ts": time.time(),
+    }
+    pipeline([
+        ["SADD", AGENTS_KEY, agent_id],
+        ["SET", _agent_key(agent_id), json.dumps(payload), "EX", str(AGENT_TTL)],
+    ])
 
 
-def get_printers():
-    raw = redis("GET", PRINTERS_KEY)
-    if not raw:
-        return {"host": None, "printers": [], "online": False, "ts": 0}
-    data = json.loads(raw)
-    data["online"] = (time.time() - data.get("ts", 0)) < 90
-    return data
+def list_agents():
+    """Return every known agent with its printers and online status.
+
+    Agents whose records have expired (no recent heartbeat) are reported as
+    offline and lazily pruned from the index.
+    """
+    ids = redis("SMEMBERS", AGENTS_KEY) or []
+    if not ids:
+        return []
+    records = pipeline([["GET", _agent_key(i)] for i in ids])
+    now = time.time()
+    agents = []
+    stale = []
+    for agent_id, raw in zip(ids, records):
+        if not raw:
+            stale.append(agent_id)
+            continue
+        data = json.loads(raw)
+        data["online"] = (now - data.get("ts", 0)) < AGENT_ONLINE_WINDOW
+        agents.append(data)
+    if stale:
+        redis("SREM", AGENTS_KEY, *stale)
+    agents.sort(key=lambda a: (not a.get("online"), (a.get("host") or "").lower()))
+    return agents

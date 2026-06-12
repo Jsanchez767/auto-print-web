@@ -247,7 +247,16 @@ class Handler(BaseHTTPRequestHandler):
             self._send_file(os.path.join(STATIC_DIR, STATIC_FILES[path]))
             return
         if path == "/api/printers":
-            self._send_json(list_printers())
+            info = list_printers()
+            self._send_json({
+                "agents": [{
+                    "agent_id": "local",
+                    "host": info.get("host"),
+                    "online": True,
+                    "printers": info.get("printers", []),
+                }],
+                "online": True,
+            })
             return
         if path == "/api/jobs":
             with _state_lock:

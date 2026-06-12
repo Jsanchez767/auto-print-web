@@ -9,8 +9,16 @@ with the CUPS `lp` command, and reports the result back.
 Usage:
     python3 agent.py --relay https://your-app.vercel.app --token YOUR_AGENT_TOKEN
 
+Options:
+    --name "Front Desk Mac"   Friendly name shown in the web app (defaults to
+                              this computer's hostname).
+
 You can also use environment variables instead of flags:
     RELAY_URL=https://your-app.vercel.app AGENT_TOKEN=... python3 agent.py
+
+Multiple people can each run their own agent; every agent registers its own
+printers under a stable, automatically-generated agent id, so the web app shows
+everyone's printers grouped by computer.
 
 Requires only the Python standard library (and CUPS `lp`/`lpstat`, built in on
 macOS and Linux).
@@ -29,6 +37,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import uuid
 
 POLL_INTERVAL = 2.0        # seconds between job polls
 HEARTBEAT_INTERVAL = 20.0  # seconds between printer/heartbeat reports
@@ -36,6 +45,26 @@ ALLOWED_EXTENSIONS = {
     ".pdf", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".bmp",
     ".doc", ".docx", ".rtf", ".odt", ".ps",
 }
+
+
+def stable_agent_id():
+    """Return a stable id for this machine, persisted to a local file."""
+    cfg_dir = os.path.expanduser("~/.config/auto-print")
+    path = os.path.join(cfg_dir, "agent_id")
+    try:
+        if os.path.exists(path):
+            with open(path) as f:
+                existing = f.read().strip()
+            if existing:
+                return existing
+        os.makedirs(cfg_dir, exist_ok=True)
+        new_id = uuid.uuid4().hex
+        with open(path, "w") as f:
+            f.write(new_id)
+        return new_id
+    except OSError:
+        # Fall back to a hostname-derived id if the file can't be written.
+        return "host-" + uuid.uuid5(uuid.NAMESPACE_DNS, socket.gethostname()).hex[:12]
 
 
 def list_printers():
@@ -111,6 +140,8 @@ def main():
                         help="Base URL of your Vercel deployment")
     parser.add_argument("--token", default=os.environ.get("AGENT_TOKEN", ""),
                         help="Agent token (must match AGENT_TOKEN on Vercel)")
+    parser.add_argument("--name", default=os.environ.get("AGENT_NAME", ""),
+                        help="Friendly name shown in the web app (default: hostname)")
     args = parser.parse_args()
 
     relay = args.relay.rstrip("/")
@@ -118,11 +149,13 @@ def main():
     if not relay:
         sys.exit("Error: provide --relay https://your-app.vercel.app (or RELAY_URL)")
 
-    host = socket.gethostname()
+    agent_id = stable_agent_id()
+    host = args.name.strip() or socket.gethostname()
     print("=" * 60)
     print("  Auto-Print Agent")
     print("=" * 60)
     print(f"  This computer : {host}")
+    print(f"  Agent id      : {agent_id}")
     print(f"  Relay         : {relay}")
     print(f"  Printers      : {', '.join(p['name'] for p in list_printers()) or 'none'}")
     print("  Connecting… press Ctrl+C to stop.")
@@ -135,7 +168,7 @@ def main():
         if now - last_heartbeat >= HEARTBEAT_INTERVAL:
             try:
                 http("POST", f"{relay}/api/heartbeat", token,
-                     {"host": host, "printers": list_printers()})
+                     {"agent_id": agent_id, "host": host, "printers": list_printers()})
                 last_heartbeat = now
             except urllib.error.HTTPError as exc:
                 if exc.code == 401:
