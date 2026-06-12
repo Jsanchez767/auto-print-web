@@ -1,23 +1,33 @@
-# Render Blueprint for Auto-Print.
-# Create the service from this file:  Render dashboard → New → Blueprint →
-# pick this repo. Render reads this and provisions the web service.
-services:
-  - type: web
-    name: auto-print
-    runtime: python
-    plan: starter          # "starter" stays always-on ($7/mo). Use "free" to test (sleeps when idle).
-    region: oregon         # change if you prefer a closer region
-    branch: main
-    buildCommand: ""       # pure Python stdlib — nothing to build
-    startCommand: python3 cloud_server.py
-    healthCheckPath: /api/info
-    autoDeploy: true
-    envVars:
-      - key: ACCESS_KEY    # key the browser must enter; set a value in the dashboard
-        sync: false
-      - key: AGENT_TOKEN   # token the local agent must send
-        sync: false
-      - key: PUBLIC_HOST   # optional: your custom domain, e.g. print.maticsapp.com
-        sync: false
-      - key: IPP_DEFAULT   # optional: force AirPrint target as "agentid||printer"
-        sync: false
+# Render Blueprint for Auto-Print (project/environment format, version "1").
+# Joins your existing "My project" → "Maticsapp" environment as a new web
+# service. This file only declares the auto-print service; your Maticsapp and
+# matic-platform services stay managed from their own repos.
+#
+# Deploy: Render dashboard → New → Blueprint → pick the auto-print-web repo.
+version: "1"
+projects:
+  - name: My project
+    environments:
+      - name: Maticsapp
+        services:
+          - type: web
+            name: auto-print
+            runtime: python
+            repo: https://github.com/Jsanchez767/auto-print-web
+            plan: starter            # always-on. Use "free" to test (sleeps when idle).
+            region: ohio             # same region as your Maticsapp web service
+            buildCommand: ""         # pure Python stdlib — nothing to build
+            startCommand: python3 cloud_server.py
+            healthCheckPath: /api/info
+            autoDeployTrigger: commit
+            domains:
+              - print.maticsapp.com
+            envVars:
+              - key: PUBLIC_HOST     # advertised in the ipps:// printer URL
+                value: print.maticsapp.com
+              - key: ACCESS_KEY      # key the browser must enter; set in dashboard
+                sync: false
+              - key: AGENT_TOKEN     # token the local agent must send; set in dashboard
+                sync: false
+              - key: IPP_DEFAULT     # optional: force AirPrint target "agentid||printer"
+                sync: false
