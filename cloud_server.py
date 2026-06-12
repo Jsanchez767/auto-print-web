@@ -43,7 +43,9 @@ import ipp_server as ipp  # reuse the IPP wire codec
 
 STATIC_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_FILES = {"/": "index.html", "/index.html": "index.html",
-                "/app.js": "app.js", "/style.css": "style.css"}
+                "/app.js": "app.js", "/style.css": "style.css",
+                "/print-here": "print-here.html",
+                "/print-here.html": "print-here.html"}
 
 ACCESS_KEY = os.environ.get("ACCESS_KEY", "")
 AGENT_TOKEN = os.environ.get("AGENT_TOKEN", "")

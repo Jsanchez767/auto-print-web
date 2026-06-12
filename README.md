@@ -154,6 +154,46 @@ Redeploy after adding them.
 
 ---
 
+## Print from a browser — no install ("Print Here")
+
+If you can't (or don't want to) install the Python agent, you can let a **browser
+tab** do the printing instead. On the computer connected to the printer, open:
+
+```
+https://your-app.onrender.com/print-here
+```
+
+Enter the same **agent token** as your server, give the computer a name, and click
+**Start receiving**. Leave the tab open. Any job sent from the website now prints
+on that computer's **default printer**.
+
+**Make it fully silent (no popup per job).** Browsers normally show a print
+dialog. To skip it, launch Chrome or Edge with *kiosk printing* — no install or
+admin rights needed, just a launch flag:
+
+```bash
+# macOS
+"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+  --kiosk-printing --app=https://your-app.onrender.com/print-here
+
+# Windows
+chrome.exe --kiosk-printing --app=https://your-app.onrender.com/print-here
+```
+
+Trade-offs vs. the installed agent:
+
+| | Print Here (browser) | Agent (`agent.py`) |
+|---|---|---|
+| Install needed | none (just a browser tab) | Python (+ SumatraPDF on Windows for PDFs) |
+| Silent printing | only with `--kiosk-printing` | always |
+| Printer choice | **default printer only** | any printer, pick from a list |
+| File types | PDF, images, text | PDF, images, text, Office docs, etc. |
+| Must stay open | the tab must stay open | runs in the background |
+
+> The browser can't print Word/Excel/etc. directly — for those, use the agent.
+
+---
+
 ## Run the agent (on the printer's computer)
 
 The agent runs on the machine connected to the printer. It only needs Python 3.
