@@ -48,6 +48,16 @@
   .hint { font-size: 12px; color: #8b949e; margin-top: 16px; }
   code { background: #0d1117; padding: 2px 6px; border-radius: 5px;
     border: 1px solid #30363d; font-size: 12px; }
+  details.kiosk { margin-top: 18px; border-top: 1px solid #30363d; padding-top: 14px; }
+  details.kiosk summary { cursor: pointer; font-weight: 600; font-size: 13px;
+    color: #58a6ff; }
+  details.kiosk[open] summary { margin-bottom: 8px; }
+  .copy-row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+  .copy-row input { flex: 1; font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12px; }
+  button.ghost { margin: 0; width: auto; padding: 9px 14px; background: #21262d;
+    border: 1px solid #30363d; }
+  details.kiosk a { color: #58a6ff; }
   #frameHolder { position: fixed; width: 0; height: 0; overflow: hidden;
     left: -9999px; top: -9999px; }
 </style>
@@ -71,9 +81,20 @@
 
     <div class="log" id="log"></div>
 
-    <p class="hint">For <strong>silent</strong> printing (no popup each time), launch
-      Chrome/Edge with kiosk printing:<br />
-      <code>chrome --kiosk-printing --app=THIS_PAGE_URL</code></p>
+    <details class="kiosk">
+      <summary>Print silently (no popup) — kiosk mode</summary>
+      <p class="hint">Normally the browser shows a print dialog for each job. To print
+        automatically with no popup, close this browser and relaunch it pointed at
+        this page with the <code>--kiosk-printing</code> flag:</p>
+      <div class="copy-row">
+        <input id="kioskCmd" readonly />
+        <button id="copyKiosk" type="button" class="ghost">Copy</button>
+      </div>
+      <p class="hint">Or use a one-click launcher (downloads from the project):
+        <a id="dlMac" href="/launch-print-here-mac.command" download>macOS launcher</a> ·
+        <a id="dlWin" href="/launch-print-here-windows.bat" download>Windows launcher</a>.
+        Edit the URL inside if your address is different.</p>
+    </details>
   </main>
 
   <div id="frameHolder"></div>
@@ -283,6 +304,25 @@ function stop() {
 
 els.toggle.addEventListener("click", () => (running ? stop() : start()));
 els.name.value = localStorage.getItem("autoprint_name") || "";
+
+// Fill the kiosk-mode command with this page's real URL.
+(function setupKiosk() {
+  const cmd = $("kioskCmd");
+  const copy = $("copyKiosk");
+  if (!cmd) return;
+  const url = location.href.split("#")[0];
+  const isWin = /Windows/.test(navigator.userAgent);
+  cmd.value = isWin
+    ? `chrome.exe --kiosk-printing --app=${url}`
+    : `"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --kiosk-printing --app=${url}`;
+  if (copy) {
+    copy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(cmd.value); copy.textContent = "Copied"; }
+      catch (e) { cmd.select(); }
+      setTimeout(() => (copy.textContent = "Copy"), 1500);
+    });
+  }
+})();
 
 // Warn before leaving while receiving.
 window.addEventListener("beforeunload", (e) => {

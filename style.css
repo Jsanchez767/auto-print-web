@@ -336,6 +336,69 @@ select option { font-weight: 400; }
   .card.span-2 { grid-column: auto; }
 }
 
+/* ---------- Add-to-device address grid + OS tabs ---------- */
+.addr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 16px;
+  margin-bottom: 18px;
+}
+.addr-grid .field { margin: 0; }
+@media (max-width: 560px) {
+  .addr-grid { grid-template-columns: 1fr; }
+}
+
+.os-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.os-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color .15s, border-color .15s;
+}
+.os-tab:hover { color: var(--fg-2); }
+.os-tab.is-active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.os-steps {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--fg-2);
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+.os-steps li { margin: 4px 0; }
+.os-steps li.note {
+  list-style: none;
+  margin-left: -20px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.os-steps code {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  background: var(--hover);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
 .msg {
   min-height: 18px;
   margin: 14px 0 0;

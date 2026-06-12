@@ -105,17 +105,48 @@
         </div>
         <div class="card-body">
           <p class="muted-sm" style="margin-top:0">
-            Add this address as a printer on a Mac, iPhone, iPad, Windows or Linux
-            device. Everything you print to it goes to the default printer below.
+            Add this as a printer on a Mac, iPhone, iPad, Windows or Linux device
+            using its address. Everything you print to it goes to the
+            <strong>default printer</strong> chosen below.
           </p>
-          <div class="field">
-            <label for="ippUrl">Printer address</label>
-            <div class="copy-row">
-              <input id="ippUrl" type="text" readonly value="—" />
-              <button id="copyIpp" class="btn-secondary" type="button">Copy</button>
+
+          <div class="addr-grid">
+            <div class="field">
+              <label for="ippHost">Address / host</label>
+              <div class="copy-row">
+                <input id="ippHost" type="text" readonly value="—" />
+                <button class="btn-secondary" type="button" data-copy="ippHost">Copy</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="ippProto">Protocol</label>
+              <input id="ippProto" type="text" readonly value="Internet Printing Protocol (IPP)" />
+            </div>
+            <div class="field">
+              <label for="ippQueue">Queue / path</label>
+              <div class="copy-row">
+                <input id="ippQueue" type="text" readonly value="ipp/print" />
+                <button class="btn-secondary" type="button" data-copy="ippQueue">Copy</button>
+              </div>
+            </div>
+            <div class="field">
+              <label for="ippUrl">Full address</label>
+              <div class="copy-row">
+                <input id="ippUrl" type="text" readonly value="—" />
+                <button id="copyIpp" class="btn-secondary" type="button">Copy</button>
+              </div>
             </div>
           </div>
-          <div class="field">
+
+          <div class="os-tabs" role="tablist">
+            <button class="os-tab is-active" type="button" data-os="mac" role="tab">macOS</button>
+            <button class="os-tab" type="button" data-os="ios" role="tab">iPhone / iPad</button>
+            <button class="os-tab" type="button" data-os="win" role="tab">Windows</button>
+            <button class="os-tab" type="button" data-os="linux" role="tab">Linux</button>
+          </div>
+          <ol class="os-steps" id="osSteps"></ol>
+
+          <div class="field" style="margin-top:18px">
             <label>Default printer for added devices</label>
             <div class="copy-row">
               <span id="defaultRoute" class="muted-sm">none set</span>

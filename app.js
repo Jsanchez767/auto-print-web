@@ -18,6 +18,9 @@ const els = {
   connText: $("connText"),
   hostName: $("hostName"),
   ippUrl: $("ippUrl"),
+  ippHost: $("ippHost"),
+  ippQueue: $("ippQueue"),
+  osSteps: $("osSteps"),
   copyIpp: $("copyIpp"),
   defaultRoute: $("defaultRoute"),
   setDefault: $("setDefault"),
@@ -189,8 +192,105 @@ async function loadIppUrl() {
     const res = await fetch("/api/info");
     const data = await res.json();
     if (data.ipp_uri) els.ippUrl.value = data.ipp_uri;
+    const host = data.ipp_host || (data.ipp_uri || "").replace(/^[a-z]+:\/\//, "").split("/")[0] || "";
+    const queue = data.ipp_queue || "ipp/print";
+    if (els.ippHost) els.ippHost.value = host || "—";
+    if (els.ippQueue) els.ippQueue.value = queue;
+    renderOsSteps(currentOs, { host, queue, url: data.ipp_uri || "", secure: !!data.secure });
   } catch (e) {}
 }
+
+// --------------------------------------------------------------------- //
+// "Add to your devices" — per-OS instructions
+// --------------------------------------------------------------------- //
+let currentOs = "mac";
+let ippInfo = { host: "", queue: "ipp/print", url: "", secure: true };
+
+function guessOs() {
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua)) return "ios";
+  if (/Android/.test(ua)) return "ios"; // closest guided path
+  if (/Windows/.test(ua)) return "win";
+  if (/Mac OS X|Macintosh/.test(ua)) return "mac";
+  if (/Linux/.test(ua)) return "linux";
+  return "mac";
+}
+
+function osStepsHtml(os, info) {
+  const host = info.host || "—";
+  const queue = info.queue || "ipp/print";
+  const url = info.url || "—";
+  if (os === "mac") {
+    return [
+      "Open <strong>System Settings → Printers &amp; Scanners</strong>.",
+      "Click <strong>Add Printer, Scanner or Fax…</strong>, then the <strong>IP</strong> tab.",
+      `<strong>Address:</strong> <code>${host}</code>`,
+      "<strong>Protocol:</strong> Internet Printing Protocol&nbsp;–&nbsp;IPP",
+      `<strong>Queue:</strong> <code>${queue}</code>`,
+      "Pick <em>Generic PostScript Printer</em> for the driver, then <strong>Add</strong>.",
+    ];
+  }
+  if (os === "win") {
+    return [
+      "Open <strong>Settings → Bluetooth &amp; devices → Printers &amp; scanners</strong>.",
+      "Click <strong>Add device</strong>, wait, then <strong>Add manually</strong>.",
+      "Choose <strong>Select a shared printer by name</strong> and paste:",
+      `<code>${url}</code>`,
+      "Click <strong>Next</strong>, accept the <em>Generic / MS Publisher</em> driver, then <strong>Finish</strong>.",
+    ];
+  }
+  if (os === "linux") {
+    return [
+      "Open your printer settings (or <code>http://localhost:631</code> for CUPS).",
+      "Add a printer with this connection URI:",
+      `<code>${(info.secure ? "ipps" : "ipp")}://${host}/${queue}</code>`,
+      "Choose a <em>Generic IPP / PostScript</em> driver and save.",
+    ];
+  }
+  // iOS / mobile
+  return [
+    "On the <strong>same Wi-Fi</strong> as the printer computer, AirPrint shows it automatically — just tap <strong>Share → Print</strong> and pick it.",
+    "iPhone/iPad can't add a printer by IP over the internet (no manual add in iOS).",
+    "From another network, use this website to upload and print instead.",
+  ];
+}
+
+function renderOsSteps(os, info) {
+  if (info) ippInfo = info;
+  currentOs = os;
+  if (!els.osSteps) return;
+  document.querySelectorAll(".os-tab").forEach((t) =>
+    t.classList.toggle("is-active", t.dataset.os === os));
+  const steps = osStepsHtml(os, ippInfo);
+  els.osSteps.innerHTML = "";
+  steps.forEach((html) => {
+    const li = document.createElement("li");
+    // Lines that are pure notes (start with lowercase advice) stay as steps;
+    // mark explicit notes for iOS.
+    li.innerHTML = html;
+    els.osSteps.appendChild(li);
+  });
+}
+
+document.querySelectorAll(".os-tab").forEach((tab) => {
+  tab.addEventListener("click", () => renderOsSteps(tab.dataset.os));
+});
+
+// Generic copy buttons (data-copy="elementId").
+document.querySelectorAll("[data-copy]").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    const target = document.getElementById(btn.dataset.copy);
+    if (!target) return;
+    try {
+      await navigator.clipboard.writeText(target.value);
+      ippShow("Copied ✓", true);
+    } catch (e) {
+      target.select();
+      ippShow("Press ⌘C / Ctrl-C to copy.", true);
+    }
+  });
+});
+
 
 function ippShow(text, ok) {
   if (!els.ippMsg) return;
@@ -353,6 +453,7 @@ els.send.addEventListener("click", async () => {
 // --------------------------------------------------------------------- //
 // Init + polling loops
 // --------------------------------------------------------------------- //
+currentOs = guessOs();
 loadIppUrl();
 loadPrinters();
 loadJobs();

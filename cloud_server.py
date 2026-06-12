@@ -47,6 +47,12 @@ STATIC_FILES = {"/": "index.html", "/index.html": "index.html",
                 "/print-here": "print-here.html",
                 "/print-here.html": "print-here.html"}
 
+# Files offered as a download (one-click kiosk launchers).
+DOWNLOAD_FILES = {
+    "/launch-print-here-mac.command": "launch-print-here-mac.command",
+    "/launch-print-here-windows.bat": "launch-print-here-windows.bat",
+}
+
 ACCESS_KEY = os.environ.get("ACCESS_KEY", "")
 AGENT_TOKEN = os.environ.get("AGENT_TOKEN", "")
 IPP_DEFAULT = os.environ.get("IPP_DEFAULT", "")
@@ -238,6 +244,20 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _download(self, path, filename):
+        full = os.path.join(STATIC_DIR, filename)
+        if not os.path.isfile(full):
+            self.send_error(404, "Not found")
+            return
+        with open(full, "rb") as f:
+            data = f.read()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/octet-stream")
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
     def _public_host(self):
         return PUBLIC_HOST or self.headers.get("Host") or "localhost"
 
@@ -248,7 +268,6 @@ class Handler(BaseHTTPRequestHandler):
     def _printer_uri(self):
         scheme = "ipps" if self._scheme() == "https" else "ipp"
         return f"{scheme}://{self._public_host()}/ipp/print"
-
     # ---- GET ---- #
     def do_GET(self):
         path = self.path.split("?", 1)[0]
@@ -256,6 +275,9 @@ class Handler(BaseHTTPRequestHandler):
 
         if path in STATIC_FILES:
             self._file(os.path.join(STATIC_DIR, STATIC_FILES[path]))
+            return
+        if path in DOWNLOAD_FILES:
+            self._download(path, DOWNLOAD_FILES[path])
             return
         if path == "/ipp/print":
             msg = (f"Auto-Print IPP endpoint is running.\n"
@@ -267,7 +289,11 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(msg)
             return
         if path == "/api/info":
-            self._json({"ok": True, "time": _now(), "ipp_uri": self._printer_uri()})
+            self._json({"ok": True, "time": _now(),
+                        "ipp_uri": self._printer_uri(),
+                        "ipp_host": self._public_host(),
+                        "ipp_queue": "ipp/print",
+                        "secure": self._scheme() == "https"})
             return
         if path == "/api/printers":
             if not access_ok(self.headers):
