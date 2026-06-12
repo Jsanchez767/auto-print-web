@@ -215,36 +215,46 @@ textarea { resize: vertical; min-height: 96px; }
 select optgroup { font-weight: 600; color: var(--fg); }
 select option { font-weight: 400; }
 
-/* ---------- Segmented control ---------- */
-.seg {
-  display: inline-flex;
-  background: var(--hover);
+/* ---------- File list ---------- */
+.file-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 3px;
-  gap: 3px;
-  margin-bottom: 16px;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: var(--card);
 }
-.seg-btn {
+.file-item .file-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg);
+}
+.file-item.over { border-color: #e5484d; }
+.file-item.over .file-meta { color: #e5484d; }
+.file-rm {
   border: none;
   background: transparent;
   color: var(--muted);
-  font-family: var(--font);
-  font-size: 13px;
-  font-weight: 500;
-  padding: 6px 18px;
-  border-radius: 6px;
+  font-size: 18px;
+  line-height: 1;
   cursor: pointer;
-  transition: background .15s, color .15s;
+  padding: 0 4px;
+  border-radius: 6px;
+  transition: color .15s, background .15s;
 }
-.seg-btn.active {
-  background: var(--card);
-  color: var(--fg);
-  box-shadow: 0 1px 2px rgba(0,0,0,.08);
-}
-
-.tabpane { display: none; }
-.tabpane.active { display: block; }
+.file-rm:hover { color: var(--fg); background: var(--hover); }
 
 /* ---------- Dropzone ---------- */
 .drop {

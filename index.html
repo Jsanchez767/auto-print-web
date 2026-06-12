@@ -57,28 +57,19 @@
             </div>
           </div>
 
-          <div class="seg" role="tablist">
-            <button class="seg-btn active" data-tab="text" role="tab">Text</button>
-            <button class="seg-btn" data-tab="file" role="tab">File</button>
-          </div>
-
-          <div id="tab-text" class="tabpane active">
-            <div class="field">
-              <textarea id="text" rows="6" placeholder="Type anything to print…"></textarea>
-            </div>
-          </div>
-
-          <div id="tab-file" class="tabpane">
+          <div class="field">
+            <label>Files</label>
             <label id="drop" class="drop">
-              <input id="file" type="file"
+              <input id="file" type="file" multiple
                 accept=".pdf,.txt,.png,.jpg,.jpeg,.gif,.bmp,.doc,.docx,.rtf,.odt,.ps" />
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <path d="M12 16V4m0 0L8 8m4-4l4 4M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
                   stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-              <span id="dropText">Choose a file or drop it here</span>
-              <small>Max 3 MB · PDF, images, docs</small>
+              <span id="dropText">Choose files or drop them here</span>
+              <small>Up to 3 MB each · PDF, images, docs</small>
             </label>
+            <ul id="fileList" class="file-list"></ul>
           </div>
 
           <div class="actions">

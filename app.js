@@ -6,10 +6,10 @@ const els = {
   key: $("key"),
   device: $("device"),
   printer: $("printer"),
-  text: $("text"),
   file: $("file"),
   drop: $("drop"),
   dropText: $("dropText"),
+  fileList: $("fileList"),
   copies: $("copies"),
   send: $("send"),
   msg: $("msg"),
@@ -19,7 +19,8 @@ const els = {
   hostName: $("hostName"),
 };
 
-let currentTab = "text";
+// Files staged for printing (DataTransfer lets us add across multiple drops).
+let staged = new DataTransfer();
 
 // --------------------------------------------------------------------- //
 // Persisted fields
@@ -40,27 +41,70 @@ function authHeaders(extra) {
 }
 
 // --------------------------------------------------------------------- //
-// Tabs
+// File drag & drop (multiple)
 // --------------------------------------------------------------------- //
-document.querySelectorAll(".tab").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    currentTab = btn.dataset.tab;
-    document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b === btn));
-    document.querySelectorAll(".tabpane").forEach((p) => p.classList.remove("active"));
-    $("tab-" + currentTab).classList.add("active");
-  });
-});
+const MAX_BYTES = 3 * 1024 * 1024;
 
-// --------------------------------------------------------------------- //
-// File drag & drop
-// --------------------------------------------------------------------- //
-function updateDropLabel() {
-  const f = els.file.files[0];
-  els.dropText.textContent = f
-    ? `${f.name} (${formatSize(f.size)})`
-    : "Choose a file or drop it here";
+function syncFileInput() {
+  els.file.files = staged.files;
 }
-els.file.addEventListener("change", updateDropLabel);
+
+function addFiles(fileList) {
+  for (const f of fileList) {
+    // Skip exact duplicates (same name + size).
+    let dup = false;
+    for (const existing of staged.files) {
+      if (existing.name === f.name && existing.size === f.size) { dup = true; break; }
+    }
+    if (!dup) staged.items.add(f);
+  }
+  syncFileInput();
+  renderFileList();
+}
+
+function removeFile(index) {
+  const next = new DataTransfer();
+  Array.from(staged.files).forEach((f, i) => { if (i !== index) next.items.add(f); });
+  staged = next;
+  syncFileInput();
+  renderFileList();
+}
+
+function clearFiles() {
+  staged = new DataTransfer();
+  syncFileInput();
+  renderFileList();
+}
+
+function renderFileList() {
+  const files = Array.from(staged.files);
+  els.dropText.textContent = files.length
+    ? `${files.length} file${files.length > 1 ? "s" : ""} selected — add more`
+    : "Choose files or drop them here";
+  els.fileList.innerHTML = "";
+  files.forEach((f, i) => {
+    const li = document.createElement("li");
+    const over = f.size > MAX_BYTES;
+    li.className = "file-item" + (over ? " over" : "");
+    const meta = document.createElement("span");
+    meta.className = "file-meta";
+    meta.textContent = `${f.name} · ${formatSize(f.size)}${over ? " · too large" : ""}`;
+    const rm = document.createElement("button");
+    rm.type = "button";
+    rm.className = "file-rm";
+    rm.textContent = "\u00d7";
+    rm.title = "Remove";
+    rm.addEventListener("click", (ev) => { ev.preventDefault(); removeFile(i); });
+    li.appendChild(meta);
+    li.appendChild(rm);
+    els.fileList.appendChild(li);
+  });
+}
+
+els.file.addEventListener("change", () => {
+  // Browser replaces selection on each pick; merge into staged set.
+  addFiles(els.file.files);
+});
 ["dragenter", "dragover"].forEach((e) =>
   els.drop.addEventListener(e, (ev) => { ev.preventDefault(); els.drop.classList.add("hover"); })
 );
@@ -68,10 +112,7 @@ els.file.addEventListener("change", updateDropLabel);
   els.drop.addEventListener(e, (ev) => { ev.preventDefault(); els.drop.classList.remove("hover"); })
 );
 els.drop.addEventListener("drop", (ev) => {
-  if (ev.dataTransfer.files.length) {
-    els.file.files = ev.dataTransfer.files;
-    updateDropLabel();
-  }
+  if (ev.dataTransfer.files.length) addFiles(ev.dataTransfer.files);
 });
 
 function formatSize(bytes) {
@@ -198,42 +239,46 @@ els.send.addEventListener("click", async () => {
   const hostLabel = els.printer.selectedOptions[0]
     ? els.printer.selectedOptions[0].parentNode.label.replace(/ \(offline\)$/, "")
     : "";
-  const payload = { device, agent_id: agentId, host: hostLabel, printer, copies, kind: currentTab };
 
-  if (currentTab === "file") {
-    const f = els.file.files[0];
-    if (!f) return showMsg("Choose a file first.", false);
-    if (f.size > 3 * 1024 * 1024) return showMsg("File exceeds 3 MB (Vercel limit).", false);
-    payload.filename = f.name;
-    payload.content = await readFileAsBase64(f);
-  } else {
-    if (!els.text.value.trim()) return showMsg("Type something to print.", false);
-    payload.text = els.text.value;
+  const files = Array.from(staged.files);
+  if (!files.length) return showMsg("Choose at least one file.", false);
+  const tooBig = files.filter((f) => f.size > MAX_BYTES);
+  if (tooBig.length) {
+    return showMsg(`Too large (3 MB max): ${tooBig.map((f) => f.name).join(", ")}`, false);
   }
 
   els.send.disabled = true;
-  showMsg("Sending…", true);
-  try {
-    const res = await fetch("/api/print", {
-      method: "POST",
-      headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (res.ok && data.job) {
-      showMsg("Queued ✓ — the printer computer will print it shortly.", true);
-      els.text.value = "";
-      els.file.value = "";
-      updateDropLabel();
-      loadJobs();
-    } else {
-      showMsg("Failed: " + (data.error || "unknown error"), false);
+  let ok = 0;
+  const failed = [];
+  for (const f of files) {
+    showMsg(`Sending ${f.name}…`, true);
+    const payload = {
+      device, agent_id: agentId, host: hostLabel, printer, copies, kind: "file",
+      filename: f.name,
+      content: await readFileAsBase64(f),
+    };
+    try {
+      const res = await fetch("/api/print", {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (res.ok && data.job) ok++;
+      else failed.push(`${f.name}: ${data.error || "error"}`);
+    } catch (e) {
+      failed.push(`${f.name}: ${e.message}`);
     }
-  } catch (e) {
-    showMsg("Network error: " + e.message, false);
-  } finally {
-    els.send.disabled = false;
   }
+
+  if (failed.length) {
+    showMsg(`Queued ${ok}/${files.length}. Failed — ${failed.join("; ")}`, false);
+  } else {
+    showMsg(`Queued ${ok} file${ok > 1 ? "s" : ""} ✓ — printing shortly.`, true);
+    clearFiles();
+  }
+  loadJobs();
+  els.send.disabled = false;
 });
 
 // --------------------------------------------------------------------- //
