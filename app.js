@@ -219,15 +219,16 @@ function guessOs() {
 function osStepsHtml(os, info) {
   const host = info.host || "—";
   const queue = info.queue || "ipp/print";
-  const url = info.url || "—";
+  const ippsUrl = info.url || "—";
+  const httpsUrl = (info.secure ? "https://" : "http://") + host + "/" + queue;
   if (os === "mac") {
     return [
-      "Open <strong>System Settings → Printers &amp; Scanners</strong>.",
-      "Click <strong>Add Printer, Scanner or Fax…</strong>, then the <strong>IP</strong> tab.",
-      `<strong>Address:</strong> <code>${host}</code>`,
-      "<strong>Protocol:</strong> Internet Printing Protocol&nbsp;–&nbsp;IPP",
-      `<strong>Queue:</strong> <code>${queue}</code>`,
-      "Pick <em>Generic PostScript Printer</em> for the driver, then <strong>Add</strong>.",
+      "The <em>Add Printer</em> window won't work here (it uses port 631 without encryption). Use Terminal instead — it's two steps:",
+      "Open <strong>Terminal</strong> (Applications → Utilities → Terminal).",
+      "Paste this and press Return:",
+      `<code>lpadmin -p AutoPrint -E -v "${ippsUrl}" -m everywhere</code>`,
+      "If it replies <em>forbidden</em>, run it again with <code>sudo</code> in front and enter your Mac password.",
+      "<strong>AutoPrint</strong> now appears in your printer list — print to it from any app.",
     ];
   }
   if (os === "win") {
@@ -235,22 +236,23 @@ function osStepsHtml(os, info) {
       "Open <strong>Settings → Bluetooth &amp; devices → Printers &amp; scanners</strong>.",
       "Click <strong>Add device</strong>, wait, then <strong>Add manually</strong>.",
       "Choose <strong>Select a shared printer by name</strong> and paste:",
-      `<code>${url}</code>`,
+      `<code>${httpsUrl}</code>`,
       "Click <strong>Next</strong>, accept the <em>Generic / MS Publisher</em> driver, then <strong>Finish</strong>.",
     ];
   }
   if (os === "linux") {
     return [
-      "Open your printer settings (or <code>http://localhost:631</code> for CUPS).",
-      "Add a printer with this connection URI:",
-      `<code>${(info.secure ? "ipps" : "ipp")}://${host}/${queue}</code>`,
-      "Choose a <em>Generic IPP / PostScript</em> driver and save.",
+      "Open a terminal and run (CUPS):",
+      `<code>lpadmin -p AutoPrint -E -v "${ippsUrl}" -m everywhere</code>`,
+      "Or in your printer settings, add a printer with connection URI:",
+      `<code>${ippsUrl}</code>`,
+      "Print to <strong>AutoPrint</strong> from any app.",
     ];
   }
   // iOS / mobile
   return [
-    "On the <strong>same Wi-Fi</strong> as the printer computer, AirPrint shows it automatically — just tap <strong>Share → Print</strong> and pick it.",
-    "iPhone/iPad can't add a printer by IP over the internet (no manual add in iOS).",
+    "On the <strong>same Wi-Fi</strong> as the printer computer, AirPrint shows it automatically — tap <strong>Share → Print</strong> and pick it.",
+    "iPhone/iPad can't add a printer by address over the internet (iOS has no manual-add).",
     "From another network, use this website to upload and print instead.",
   ];
 }

@@ -147,13 +147,20 @@ def update_status(job_id, status, detail):
 
 
 def resolve_default_route():
-    """Return (agent_id, printer) for IPP jobs, or (None, None)."""
+    """Return (agent_id, printer) for IPP jobs, or (None, None).
+
+    Prefer the explicitly-chosen route, but only when that agent is currently
+    online — otherwise the job would sit forever in an offline computer's queue.
+    Fall back to the first online agent and its default/first printer.
+    """
     with _lock:
         route = dict(_default_route)
-    if route["agent_id"]:
+    online = online_agents()
+    online_ids = {a["agent_id"] for a in online}
+    if route["agent_id"] and route["agent_id"] in online_ids:
         return route["agent_id"], route["printer"]
-    # Fall back to the first online agent and its default/first printer.
-    for a in online_agents():
+    # Explicit route missing or offline → use any online agent.
+    for a in online:
         printer = a.get("default") or (a["printers"][0]["name"] if a["printers"] else "")
         if printer:
             return a["agent_id"], printer
@@ -265,9 +272,17 @@ class Handler(BaseHTTPRequestHandler):
         # Render terminates TLS and sets X-Forwarded-Proto.
         return (self.headers.get("X-Forwarded-Proto") or "http").split(",")[0].strip()
 
+    def _display_host(self):
+        # IPP clients default ipps:// to port 631, but we're served on 443.
+        # Make the advertised host explicit so "add as printer" actually connects.
+        host = self._public_host()
+        if self._scheme() == "https" and ":" not in host:
+            host = host + ":443"
+        return host
+
     def _printer_uri(self):
         scheme = "ipps" if self._scheme() == "https" else "ipp"
-        return f"{scheme}://{self._public_host()}/ipp/print"
+        return f"{scheme}://{self._display_host()}/ipp/print"
     # ---- GET ---- #
     def do_GET(self):
         path = self.path.split("?", 1)[0]
@@ -291,7 +306,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/info":
             self._json({"ok": True, "time": _now(),
                         "ipp_uri": self._printer_uri(),
-                        "ipp_host": self._public_host(),
+                        "ipp_host": self._display_host(),
                         "ipp_queue": "ipp/print",
                         "secure": self._scheme() == "https"})
             return
