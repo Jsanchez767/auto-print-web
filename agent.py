@@ -2,9 +2,16 @@
 """
 Auto-Print Agent — runs on the computer connected to the printer.
 
-It connects *outbound* to your Vercel relay (so no firewall/port-forwarding is
-needed), reports its printers, pulls queued print jobs, prints them silently
-with the CUPS `lp` command, and reports the result back.
+It connects *outbound* to your relay (so no firewall/port-forwarding is
+needed), reports its printers, pulls queued print jobs, prints them silently,
+and reports the result back.
+
+Cross-platform:
+  * macOS / Linux — uses the CUPS `lp` / `lpstat` commands (built in).
+  * Windows        — uses PowerShell `Get-Printer` to list printers and prints
+                     text with `Out-Printer` (built in). For PDFs/images it uses
+                     SumatraPDF (a free, no-admin portable .exe — just drop it
+                     next to agent.py) or Adobe Reader if installed.
 
 Usage:
     python3 agent.py --relay https://your-app.vercel.app --token YOUR_AGENT_TOKEN
@@ -20,8 +27,7 @@ Multiple people can each run their own agent; every agent registers its own
 printers under a stable, automatically-generated agent id, so the web app shows
 everyone's printers grouped by computer.
 
-Requires only the Python standard library (and CUPS `lp`/`lpstat`, built in on
-macOS and Linux).
+Requires only the Python standard library.
 """
 
 import argparse
@@ -42,6 +48,7 @@ import uuid
 
 POLL_INTERVAL = 2.0        # seconds between job polls
 HEARTBEAT_INTERVAL = 20.0  # seconds between printer/heartbeat reports
+IS_WINDOWS = os.name == "nt"
 ALLOWED_EXTENSIONS = {
     ".pdf", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".bmp",
     ".doc", ".docx", ".rtf", ".odt", ".ps",
@@ -69,6 +76,12 @@ def stable_agent_id():
 
 
 def list_printers():
+    if IS_WINDOWS:
+        return _win_list_printers()
+    return _cups_list_printers()
+
+
+def _cups_list_printers():
     printers = []
     try:
         out = subprocess.run(
@@ -88,6 +101,8 @@ def list_printers():
 
 def default_printer():
     """Return the system default printer name, or '' if none."""
+    if IS_WINDOWS:
+        return _win_default_printer()
     try:
         out = subprocess.run(
             ["lpstat", "-d"], capture_output=True, text=True, timeout=10
@@ -98,6 +113,122 @@ def default_printer():
     except Exception:  # noqa: BLE001
         pass
     return ""
+
+
+# --------------------------------------------------------------------------- #
+# Windows printing (PowerShell built-ins + optional SumatraPDF/Adobe)
+# --------------------------------------------------------------------------- #
+def _run_powershell(script, timeout=20):
+    return subprocess.run(
+        ["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+        capture_output=True, text=True, timeout=timeout,
+    )
+
+
+def _ps_quote(value):
+    """Quote a string for safe use inside a PowerShell single-quoted literal."""
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _win_list_printers():
+    printers = []
+    try:
+        ps = "Get-Printer | ForEach-Object { \"$($_.Name)|$($_.PrinterStatus)\" }"
+        out = _run_powershell(ps).stdout
+        for line in out.splitlines():
+            line = line.strip()
+            if not line or "|" not in line:
+                continue
+            name, _, status = line.partition("|")
+            s = status.strip().lower()
+            norm = "idle" if s in ("normal", "0", "3") else (
+                "printing" if "print" in s else "unknown"
+            )
+            if name.strip():
+                printers.append({"name": name.strip(), "status": norm})
+    except Exception as exc:  # noqa: BLE001
+        print(f"  ! could not list printers (Windows): {exc}")
+    return printers
+
+
+def _win_default_printer():
+    try:
+        ps = "(Get-CimInstance -Class Win32_Printer -Filter 'Default = True').Name"
+        out = _run_powershell(ps).stdout.strip()
+        return out.splitlines()[0].strip() if out else ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _find_pdf_printer_tool():
+    """Locate a tool that can print PDFs/images silently. Returns (path, kind)."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    env = os.environ
+    pf = env.get("ProgramFiles", r"C:\Program Files")
+    pf86 = env.get("ProgramFiles(x86)", r"C:\Program Files (x86)")
+    local = env.get("LOCALAPPDATA", "")
+
+    sumatra_names = ["SumatraPDF.exe", "SumatraPDF-portable.exe"]
+    sumatra_dirs = [here, os.path.join(pf, "SumatraPDF"),
+                    os.path.join(pf86, "SumatraPDF")]
+    if local:
+        sumatra_dirs.append(os.path.join(local, "SumatraPDF"))
+    for d in sumatra_dirs:
+        for n in sumatra_names:
+            p = os.path.join(d, n)
+            if os.path.isfile(p):
+                return p, "sumatra"
+    on_path = shutil.which("SumatraPDF")
+    if on_path:
+        return on_path, "sumatra"
+
+    adobe_subs = [
+        r"Adobe\Acrobat Reader DC\Reader\AcroRd32.exe",
+        r"Adobe\Acrobat DC\Acrobat\Acrobat.exe",
+        r"Adobe\Reader 11.0\Reader\AcroRd32.exe",
+    ]
+    for base in (pf86, pf):
+        for sub in adobe_subs:
+            p = os.path.join(base, sub)
+            if os.path.isfile(p):
+                return p, "adobe"
+    return None, None
+
+
+def _win_print(path, printer, copies, ext):
+    # Plain text prints with no extra software.
+    if ext == ".txt":
+        target = f" -Name {_ps_quote(printer)}" if printer else ""
+        for _ in range(copies):
+            ps = f"Get-Content -Raw -LiteralPath {_ps_quote(path)} | Out-Printer{target}"
+            r = _run_powershell(ps, timeout=60)
+            if r.returncode != 0:
+                raise RuntimeError(r.stderr.strip() or "Out-Printer failed")
+        return "submitted (text)"
+
+    tool, kind = _find_pdf_printer_tool()
+    if kind == "sumatra":
+        args = [tool, "-print-to", printer, "-silent", "-exit-when-done"]
+        if copies and copies > 1:
+            args += ["-print-settings", f"{copies}x"]
+        args.append(path)
+        r = subprocess.run(args, capture_output=True, text=True, timeout=120)
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr.strip() or "SumatraPDF print failed")
+        return "submitted (SumatraPDF)"
+    if kind == "adobe":
+        # AcroRd32 /t <file> <printer> prints, then leaves the app open; close it.
+        for _ in range(copies):
+            subprocess.run([tool, "/t", path, printer], timeout=120)
+        _run_powershell(
+            "Get-Process AcroRd32,Acrobat -ErrorAction SilentlyContinue | "
+            "Stop-Process -Force -ErrorAction SilentlyContinue", timeout=20)
+        return "submitted (Adobe)"
+
+    raise RuntimeError(
+        "No silent PDF printer found on this Windows PC. Drop the free, no-admin "
+        "SumatraPDF (portable .exe) next to agent.py, or install Adobe Reader."
+    )
 
 
 def http(method, url, token, body=None, timeout=30):
@@ -112,7 +243,7 @@ def http(method, url, token, body=None, timeout=30):
 
 
 def print_job(job):
-    """Materialize the job to a temp file and submit it via `lp`."""
+    """Materialize the job to a temp file and submit it to the printer."""
     tmp_dir = tempfile.mkdtemp(prefix="autoprint_agent_")
     try:
         printer = (job.get("printer") or "").strip()
@@ -129,10 +260,14 @@ def print_job(job):
             with open(path, "wb") as f:
                 f.write(raw)
         else:
+            ext = ".txt"
             text = job.get("text") or ""
             path = os.path.join(tmp_dir, "job.txt")
             with open(path, "w", encoding="utf-8") as f:
                 f.write(text)
+
+        if IS_WINDOWS:
+            return _win_print(path, printer, copies, ext)
 
         cmd = ["lp"]
         if printer:

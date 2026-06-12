@@ -156,12 +156,26 @@ Redeploy after adding them.
 
 ## Run the agent (on the printer's computer)
 
-This is the macOS/Linux machine connected to the printer. It only needs Python 3
-and the built-in `lp`/`lpstat` commands.
+The agent runs on the machine connected to the printer. It only needs Python 3.
+
+**macOS / Linux** — uses the built-in `lp`/`lpstat` commands:
 
 ```bash
 python3 agent.py --relay https://your-app.vercel.app --token YOUR_AGENT_TOKEN
 ```
+
+**Windows** — uses built-in PowerShell. Install Python 3 from python.org, then:
+
+```powershell
+python agent.py --relay https://your-app.vercel.app --token YOUR_AGENT_TOKEN
+```
+
+- Listing printers and **plain-text** printing work with no extra software
+  (PowerShell `Get-Printer` / `Out-Printer`).
+- **PDFs and images** need a silent printer. The easiest is the free
+  **SumatraPDF** — download the **portable** `.exe` (no admin/install required)
+  and drop it in the same folder as `agent.py`. Adobe Reader also works if it's
+  already installed. Without one of these, PDF jobs report a clear error.
 
 Or with environment variables (see `.env.example`):
 
@@ -171,17 +185,23 @@ RELAY_URL=https://your-app.vercel.app AGENT_TOKEN=YOUR_AGENT_TOKEN python3 agent
 
 You should see it report its printers and start polling. Leave it running.
 
-> Tip: to keep it running after you close the terminal, use `nohup`, a `tmux`
-> session, or a `launchd`/`systemd` service.
+> Work computers: the agent only makes **outbound** HTTPS calls, so it usually
+> works without firewall changes — but installing Python (or SumatraPDF) may need
+> IT approval on locked-down machines.
+
+> Tip: to keep it running after you close the terminal, use `nohup`/`tmux` or a
+> `launchd`/`systemd` service (macOS/Linux), or Task Scheduler (Windows).
 
 ---
 
 ## Sharing printers from more than one computer
 
 Anyone can share their printers — the app supports **multiple printer-host
-computers at once**. Each person just runs their own agent:
+computers at once**, on any mix of macOS, Linux, and Windows. So you can connect
+your **Windows work PC** and print to its office printers from your Mac at home.
+Each person just runs their own agent:
 
-1. Copy this project (or just `agent.py`) to their macOS/Linux computer.
+1. Copy this project (or just `agent.py`) to their computer.
 2. Run it with the **same relay URL and `AGENT_TOKEN`**, and an optional
    friendly name:
 
@@ -189,19 +209,20 @@ computers at once**. Each person just runs their own agent:
    python3 agent.py \
      --relay https://your-app.vercel.app \
      --token YOUR_AGENT_TOKEN \
-     --name "Front Desk Mac"
+     --name "Work PC"
    ```
 
-Each agent automatically gets a **stable, unique id** (saved to
-`~/.config/auto-print/agent_id`) and registers its own printers. In the web app,
-the printer dropdown groups printers **by computer**, e.g.:
+Each agent automatically gets a **stable, unique id** and registers its own
+printers. In the web app, the printer dropdown groups printers **by computer**,
+e.g.:
 
 ```
 ▾ Jesus' MacBook
     HP OfficeJet Pro 9010 (idle)
     HP Color LaserJet (idle)
-▾ Front Desk Mac
-    Brother HL-L2350DW (idle)
+▾ Work PC
+    Office HP LaserJet (idle)
+    Front Desk Brother (idle)
 ```
 
 Pick any printer and the job is routed to that specific computer's agent.
