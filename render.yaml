@@ -20,11 +20,9 @@ projects:
             startCommand: python3 cloud_server.py
             healthCheckPath: /api/info
             autoDeployTrigger: commit
-            domains:
-              - print.maticsapp.com
             envVars:
               - key: PUBLIC_HOST     # advertised in the ipps:// printer URL
-                value: print.maticsapp.com
+                value: auto-print-jnpe.onrender.com
               - key: ACCESS_KEY      # key the browser must enter; set in dashboard
                 sync: false
               - key: AGENT_TOKEN     # token the local agent must send; set in dashboard
