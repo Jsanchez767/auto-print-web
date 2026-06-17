@@ -223,23 +223,40 @@ function printOne(job, ext) {
     iframe.setAttribute("aria-hidden", "true");
     let url = null;
     let settled = false;
+    let fallbackTimer = null;
 
     const cleanup = () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
       if (url) URL.revokeObjectURL(url);
-      setTimeout(() => iframe.remove(), 2000);
+      setTimeout(() => iframe.remove(), 4000);
+    };
+    const finishOk = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve();
     };
     const done = () => {
       if (settled) return;
-      settled = true;
       try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (e) { cleanup(); reject(e); return; }
-      // We can't detect the print dialog finishing; give it a moment.
-      setTimeout(() => { cleanup(); resolve(); }, 1500);
+        const win = iframe.contentWindow;
+        if (!win) throw new Error("Print frame not ready");
+
+        // In kiosk mode this should print silently; in normal mode it opens dialog.
+        win.onafterprint = finishOk;
+        win.focus();
+        win.print();
+
+        // Fallback if afterprint never fires (common in some browser/PDF paths).
+        const waitMs = ext === ".pdf" ? 10000 : 4000;
+        fallbackTimer = setTimeout(finishOk, waitMs);
+      } catch (e) {
+        cleanup();
+        reject(e);
+      }
     };
 
-    iframe.onload = () => setTimeout(done, 250);
+    iframe.onload = () => setTimeout(done, ext === ".pdf" ? 900 : 300);
     iframe.onerror = () => { cleanup(); reject(new Error("Failed to load document")); };
 
     if (ext === ".pdf") {
