@@ -479,24 +479,25 @@ class Handler(BaseHTTPRequestHandler):
                     state = 8  # aborted: nowhere to send
                 else:
                     ext = ipp._detect_ext(doc, fmt)
-                    if ext not in ALLOWED_EXTENSIONS:
-                        ext = ".pdf"
-                    job = {
-                        "id": uuid.uuid4().hex[:8],
-                        "agent_id": agent_id,
-                        "device": (uname.decode("utf-8", "replace") or "AirPrint")[:60],
-                        "host": "",
-                        "printer": printer,
-                        "copies": max(1, min(copies, 50)),
-                        "kind": "file",
-                        "ext": ext,
-                        "content": base64.b64encode(doc).decode("ascii"),
-                        "name": f"AirPrint job{ext}",
-                        "status": "queued",
-                        "detail": "",
-                        "ts": _now(),
-                    }
-                    enqueue_job(job)
+                    if ext in ALLOWED_EXTENSIONS:
+                        job = {
+                            "id": uuid.uuid4().hex[:8],
+                            "agent_id": agent_id,
+                            "device": (uname.decode("utf-8", "replace") or "AirPrint")[:60],
+                            "host": "",
+                            "printer": printer,
+                            "copies": max(1, min(copies, 50)),
+                            "kind": "file",
+                            "ext": ext,
+                            "content": base64.b64encode(doc).decode("ascii"),
+                            "name": f"AirPrint job{ext}",
+                            "status": "queued",
+                            "detail": "",
+                            "ts": _now(),
+                        }
+                        enqueue_job(job)
+                    else:
+                        state = 8  # aborted: unsupported document format
 
             buf = ipp._response_head(req_id, ipp.S_OK, version)
             ipp.job_attributes(buf, printer_uri, job_id & 0x7FFFFFFF, state)

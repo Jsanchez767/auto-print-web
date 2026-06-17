@@ -197,7 +197,7 @@ def printer_attributes(buf, printer_uri, name, color):
     _attr(buf, V_NATLANG, "generated-natural-language-supported", [_s("en")])
     _attr(buf, V_MIMETYPE, "document-format-default", [_s("application/pdf")])
     _attr(buf, V_MIMETYPE, "document-format-supported", [
-        _s("application/pdf"), _s("image/jpeg"), _s("image/urf"),
+        _s("application/pdf"), _s("image/jpeg"),
         _s("image/png"), _s("application/octet-stream"),
     ])
     _attr(buf, V_MIMETYPE, "document-format-preferred", [_s("application/pdf")])
@@ -223,12 +223,8 @@ def printer_attributes(buf, printer_uri, name, color):
           [_s("na_letter_8.5x11in"), _s("iso_a4_210x297mm")])
     _attr(buf, V_KEYWORD, "media-ready",
           [_s("na_letter_8.5x11in"), _s("iso_a4_210x297mm")])
-    # AirPrint raster capability string (kept conservative).
-    _attr(buf, V_KEYWORD, "urf-supported", [
-        _s("CP1"), _s("IS1-4-5-19"), _s("MT1-2-3-4-5-6-8-9-10-11-12-13"),
-        _s("OB10"), _s("PQ4"), _s("RS300"), _s("SRGB24"), _s("V1.4"), _s("W8"),
-        _s("DM1"),
-    ])
+    # Do not advertise URF raster here: browser kiosk and default agent path
+    # only support PDF/TXT/images listed above.
     _attr(buf, V_KEYWORD, "job-creation-attributes-supported",
           [_s("copies"), _s("sides"), _s("media"), _s("print-color-mode")])
     _attr(buf, V_BOOLEAN, "printer-supply-info-uri-supported", [_bool(False)])
@@ -263,7 +259,7 @@ def _detect_ext(data, declared_format):
         return ".urf"
     if declared_format == "application/pdf":
         return ".pdf"
-    return ".pdf"
+    return ""
 
 
 def print_document(data, target_printer, copies, declared_format, log):
