@@ -22,7 +22,7 @@ projects:
             autoDeployTrigger: commit
             envVars:
               - key: PUBLIC_HOST     # advertised in the ipps:// printer URL
-                value: auto-print-jnpe.onrender.com
+                value: maticslab.com
               - key: ACCESS_KEY      # key the browser must enter; set in dashboard
                 sync: false
               - key: AGENT_TOKEN     # token the local agent must send; set in dashboard

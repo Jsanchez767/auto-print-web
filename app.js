@@ -190,14 +190,29 @@ async function loadIppUrl() {
   if (!els.ippUrl) return;
   try {
     const res = await fetch("/api/info");
+    if (res.status === 404) {
+      disableIppControls("AirPrint/IPP setup is unavailable on this deployment. Use Render with cloud_server.py, then point your domain there.");
+      return;
+    }
+    if (!res.ok) {
+      disableIppControls(`Could not load IPP info (HTTP ${res.status}).`);
+      return;
+    }
     const data = await res.json();
+    if (data.ipp_supported === false) {
+      disableIppControls(data.message || "AirPrint/IPP is disabled on this deployment.");
+      return;
+    }
+    if (els.setDefault) els.setDefault.disabled = false;
     if (data.ipp_uri) els.ippUrl.value = data.ipp_uri;
     const host = data.ipp_host || (data.ipp_uri || "").replace(/^[a-z]+:\/\//, "").split("/")[0] || "";
     const queue = data.ipp_queue || "ipp/print";
     if (els.ippHost) els.ippHost.value = host || "—";
     if (els.ippQueue) els.ippQueue.value = queue;
     renderOsSteps(currentOs, { host, queue, url: data.ipp_uri || "", secure: !!data.secure });
-  } catch (e) {}
+  } catch (e) {
+    disableIppControls("Could not load AirPrint/IPP details (network error).");
+  }
 }
 
 // --------------------------------------------------------------------- //
@@ -300,6 +315,14 @@ function ippShow(text, ok) {
   els.ippMsg.className = "msg " + (ok ? "ok" : "err");
 }
 
+function disableIppControls(message) {
+  if (els.setDefault) els.setDefault.disabled = true;
+  if (els.ippHost) els.ippHost.value = "Not available on this deployment";
+  if (els.ippQueue) els.ippQueue.value = "ipp/print";
+  if (els.ippUrl) els.ippUrl.value = "Not available";
+  ippShow(message, false);
+}
+
 if (els.copyIpp) {
   els.copyIpp.addEventListener("click", async () => {
     try {
@@ -314,6 +337,9 @@ if (els.copyIpp) {
 
 if (els.setDefault) {
   els.setDefault.addEventListener("click", async () => {
+    if (els.setDefault.disabled) {
+      return ippShow("AirPrint/IPP routing is not available on this deployment.", false);
+    }
     const selected = els.printer.value;
     if (!selected || selected.indexOf("||") === -1) {
       return ippShow("Pick a printer above first.", false);
@@ -328,8 +354,17 @@ if (els.setDefault) {
       if (res.ok) {
         ippShow(`Added devices will now print to ${printer} ✓`, true);
         loadPrinters();
+      } else if (res.status === 401) {
+        ippShow("Access key rejected. Re-enter the key for this domain.", false);
+      } else if (res.status === 404) {
+        disableIppControls("AirPrint/IPP setup is unavailable here. Deploy cloud_server.py on Render for /api/default + /api/info + /ipp/print.");
       } else {
-        ippShow("Could not set default (check access key).", false);
+        let detail = "";
+        try {
+          const data = await res.json();
+          detail = data && data.error ? ` (${data.error})` : "";
+        } catch (e) {}
+        ippShow(`Could not set default (HTTP ${res.status})${detail}.`, false);
       }
     } catch (e) {
       ippShow("Network error: " + e.message, false);
