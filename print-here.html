@@ -46,6 +46,18 @@
   .log .ok { color: #3fb950; }
   .log .err { color: #f85149; }
   .hint { font-size: 12px; color: #8b949e; margin-top: 16px; }
+  .warn {
+    display: none;
+    margin: 14px 0 4px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #8b6a18;
+    background: #2b1f00;
+    color: #ffd479;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .warn.show { display: block; }
   code { background: #0d1117; padding: 2px 6px; border-radius: 5px;
     border: 1px solid #30363d; font-size: 12px; }
   details.kiosk { margin-top: 18px; border-top: 1px solid #30363d; padding-top: 14px; }
@@ -79,6 +91,12 @@
 
     <button id="toggle">Start receiving</button>
 
+    <div id="destWarn" class="warn">
+      Print completed in fallback mode. Chrome may be routing to <strong>Save as PDF</strong>
+      instead of your physical default printer. Open one normal print dialog, set the
+      destination to your printer, then relaunch kiosk mode.
+    </div>
+
     <div class="log" id="log"></div>
 
     <details class="kiosk">
@@ -105,6 +123,7 @@ const $ = (id) => document.getElementById(id);
 const els = {
   dot: $("dot"), state: $("state"), name: $("name"), token: $("token"),
   toggle: $("toggle"), log: $("log"), holder: $("frameHolder"),
+  destWarn: $("destWarn"),
 };
 
 const IMAGE_EXT = [".png", ".jpg", ".jpeg", ".gif", ".bmp"];
@@ -121,6 +140,7 @@ let running = false;
 let pollTimer = null;
 let beatTimer = null;
 let busy = false;
+let fallbackPrintCount = 0;
 
 // Stable browser-agent id (one per browser profile on this computer).
 function agentId() {
@@ -145,6 +165,11 @@ function log(msg, cls) {
 function setState(text, kind) {
   els.state.textContent = text;
   els.dot.className = "dot" + (kind ? " " + kind : "");
+}
+
+function setDestWarning(show) {
+  if (!els.destWarn) return;
+  els.destWarn.classList.toggle("show", !!show);
 }
 
 function headers() {
@@ -201,8 +226,18 @@ async function handleJob(job) {
         " files. Use the agent app for those.");
     }
     const copies = Math.max(1, Math.min(parseInt(job.copies || 1, 10), 50));
+    let fallbackCopies = 0;
     for (let i = 0; i < copies; i++) {
-      await printOne(job, ext);
+      const out = await printOne(job, ext);
+      if (out && out.mode === "fallback") fallbackCopies += 1;
+    }
+    if (fallbackCopies > 0) {
+      fallbackPrintCount += fallbackCopies;
+      setDestWarning(fallbackPrintCount >= 2);
+      log("Printed using fallback timing. If paper does not come out, set destination to a physical printer (not Save as PDF).", "err");
+    } else {
+      fallbackPrintCount = 0;
+      setDestWarning(false);
     }
     await report(job.id, "printed", "Printed via browser");
     log("Printed: " + (job.name || "document"), "ok");
@@ -230,11 +265,11 @@ function printOne(job, ext) {
       if (url) URL.revokeObjectURL(url);
       setTimeout(() => iframe.remove(), 4000);
     };
-    const finishOk = () => {
+    const finishOk = (mode) => {
       if (settled) return;
       settled = true;
       cleanup();
-      resolve();
+      resolve({ mode });
     };
     const done = () => {
       if (settled) return;
@@ -243,13 +278,13 @@ function printOne(job, ext) {
         if (!win) throw new Error("Print frame not ready");
 
         // In kiosk mode this should print silently; in normal mode it opens dialog.
-        win.onafterprint = finishOk;
+        win.onafterprint = () => finishOk("afterprint");
         win.focus();
         win.print();
 
         // Fallback if afterprint never fires (common in some browser/PDF paths).
         const waitMs = ext === ".pdf" ? 10000 : 4000;
-        fallbackTimer = setTimeout(finishOk, waitMs);
+        fallbackTimer = setTimeout(() => finishOk("fallback"), waitMs);
       } catch (e) {
         cleanup();
         reject(e);
